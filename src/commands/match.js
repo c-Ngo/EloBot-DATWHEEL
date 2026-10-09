@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const queries = require('../database/queries');
-const { toDisplayRating } = require('../elo/openskill');
+const { toDisplayRating, predictWin, createRating } = require('../elo/openskill');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -42,10 +42,32 @@ module.exports = {
       ? Math.round(red.reduce((s, p) => s + (p.rating_before ?? p.elo_before ?? 1000), 0) / red.length)
       : avgRating;
 
-    function buildTeamScoreboard(teamPlayers, name, emoji, won, teamAvg) {
+    // Calculate pre-match odds
+    let winProbBlue = null;
+    let winProbRed = null;
+    if (blue.length > 0 && red.length > 0) {
+      if (
+        blue.every((p) => p.mu_before != null && p.sigma_before != null) &&
+        red.every((p) => p.mu_before != null && p.sigma_before != null)
+      ) {
+        const blueRatings = blue.map((p) => createRating({ mu: p.mu_before, sigma: p.sigma_before }));
+        const redRatings = red.map((p) => createRating({ mu: p.mu_before, sigma: p.sigma_before }));
+        const prob = predictWin(blueRatings, redRatings);
+        winProbBlue = Math.round(prob * 100);
+        winProbRed = Math.round((1 - prob) * 100);
+      } else {
+        // Fallback to Elo difference logistic probability
+        const prob = 1 / (1 + Math.pow(10, (redAvg - blueAvg) / 400));
+        winProbBlue = Math.round(prob * 100);
+        winProbRed = Math.round((1 - prob) * 100);
+      }
+    }
+
+    function buildTeamScoreboard(teamPlayers, name, emoji, won, teamAvg, teamOdds) {
+      const oddsText = teamOdds != null ? ` • Odds: **${teamOdds}%**` : '';
       const header = won
-        ? `${emoji} **${name} (VICTORY)** 🏆 • Avg: **${teamAvg} Elo**`
-        : `${emoji} **${name} (DEFEAT)** • Avg: **${teamAvg} Elo**`;
+        ? `${emoji} **${name} (VICTORY)** 🏆${oddsText} • Avg: **${teamAvg} Elo**`
+        : `${emoji} **${name} (DEFEAT)**${oddsText} • Avg: **${teamAvg} Elo**`;
 
       const colPlayer = 'Player'.padEnd(14);
       const colChamp = 'Champion'.padEnd(12);
@@ -96,15 +118,21 @@ module.exports = {
     const blueMentions = blue.map((p) => `<@${p.discord_id}>`).join(' ');
     const redMentions = red.map((p) => `<@${p.discord_id}>`).join(' ');
 
+    const oddsLine = winProbBlue != null && winProbRed != null
+      ? `🎲 **Pre-Match Odds**: 🔵 Blue **${winProbBlue}%** vs 🔴 Red **${winProbRed}%**\n`
+      : '';
+
     const embed = new EmbedBuilder()
       .setColor(blueWon ? 0x5865f2 : 0xff4444)
       .setTitle(`📊 Game Scoreboard Summary — \`${matchId}\``)
       .setDescription(
         `⏱️ **Duration**: ${minutes}m ${seconds}s • **Match Avg**: ${avgRating} Elo\n` +
-        `⚖️ **Team Avg**: 🔵 Blue **${blueAvg} Elo** vs 🔴 Red **${redAvg} Elo**\n\n` +
-        buildTeamScoreboard(blue, 'Blue Side', '🔵', blueWon, blueAvg) +
+        `⚖️ **Team Avg**: 🔵 Blue **${blueAvg} Elo** vs 🔴 Red **${redAvg} Elo**\n` +
+        oddsLine +
+        `\n` +
+        buildTeamScoreboard(blue, 'Blue Side', '🔵', blueWon, blueAvg, winProbBlue) +
         `👥 ${blueMentions}\n\n` +
-        buildTeamScoreboard(red, 'Red Side', '🔴', !blueWon, redAvg) +
+        buildTeamScoreboard(red, 'Red Side', '🔴', !blueWon, redAvg, winProbRed) +
         `👥 ${redMentions}`
       )
       .setFooter({ text: `Recorded by <@${match.recorded_by}> • ${match.recorded_at}` });

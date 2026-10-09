@@ -47,7 +47,13 @@ function skillTier(rating) {
   return { name: 'Iron', emoji: '⬛', color: 0x616161 };
 }
 
-const PODIUM_BADGES = ['🥇 #1', '🥈 #2', '🥉 #3'];
+function getRankBadge(rank) {
+  const tag = `\`#${String(rank + 1).padStart(2, '0')}\``;
+  if (rank === 0) return `🥇 ${tag}`;
+  if (rank === 1) return `🥈 ${tag}`;
+  if (rank === 2) return `🥉 ${tag}`;
+  return `🔹 ${tag}`;
+}
 
 /**
  * Builds the embed and navigation buttons for the leaderboard widget at the given page.
@@ -115,12 +121,10 @@ function createLeaderboardWidgetPayload(requestedPage = 0) {
     const isRanked = (p.wins + p.losses) >= 5;
     const form = recentFormsMap.get(p.discord_id) || [];
     const formCircles = form.map((won) => (won ? '🟢' : '🔴')).join('');
-    const formText = formCircles ? ` • ${formCircles}` : '';
 
     if (isRanked) {
       const globalRank = rankedPlayers.indexOf(p);
-      const isPodium = globalRank < 3;
-      const rankTag = isPodium ? PODIUM_BADGES[globalRank] : `\`#${String(globalRank + 1).padStart(2, '0')}\``;
+      const rankBadge = getRankBadge(globalRank);
       const ratingVal = Math.round(p.rating || 1000);
       const tier = skillTier(ratingVal);
       const totalGames = p.wins + p.losses;
@@ -132,13 +136,18 @@ function createLeaderboardWidgetPayload(requestedPage = 0) {
           ? champs.map((c) => `**${c.champion}** ${c.win_rate}% *(${c.games}G)*`).join(' • ')
           : '*No champion data available*';
 
-      const statText = `📊 **${p.wins}W ${p.losses}L** (${winRate} WR)${formText} • ${tier.name}`;
+      const lines = [
+        `> ${rankBadge}  **${ratingVal} Elo** — **${p.riot_name}** ${tier.emoji}`,
+        `> └ 📊 **${p.wins}W ${p.losses}L** (${winRate} WR) • ${tier.name}`,
+      ];
 
-      let card = [
-        `> ${rankTag}  **${ratingVal} Elo** — **${p.riot_name}** ${tier.emoji}`,
-        `> └ ${statText}`,
-        `> └ ⚔️ ${champText}`,
-      ].join('\n');
+      if (formCircles) {
+        lines.push(`> └ 🎮 **Recent**: ${formCircles}`);
+      }
+
+      lines.push(`> └ ⚔️ ${champText}`);
+
+      let card = lines.join('\n');
 
       // Add visual divider after podium (ranks 1-3)
       if (globalRank === 2 && (pagePlayers.length > 3 || unrankedPlayers.length > 0)) {
@@ -154,7 +163,13 @@ function createLeaderboardWidgetPayload(requestedPage = 0) {
     } else {
       // Unranked player (<5 games played)
       const games = p.wins + p.losses;
-      return `> ⚪ **${p.riot_name}** — *Unranked (${games}/5)*${formText}`;
+      const unrankedLines = [
+        `> ⚪ **${p.riot_name}** — *Unranked (${games}/5)*`,
+      ];
+      if (formCircles) {
+        unrankedLines.push(`> └ 🎮 **Recent**: ${formCircles}`);
+      }
+      return unrankedLines.join('\n');
     }
   });
 
@@ -166,7 +181,7 @@ function createLeaderboardWidgetPayload(requestedPage = 0) {
   embed
     .setDescription([...headerLines, cardLines.join('\n\n'), ...footerBanner].join('\n'))
     .setFooter({
-      text: `Page ${page + 1}/${totalPages} • Season 2026 • Form: 🟢W 🔴L (past 5) • OpenSkill Engine`,
+      text: `Page ${page + 1}/${totalPages} • Season 2026 • Recent: 🟢W 🔴L (past 5) • OpenSkill Engine`,
     });
 
   const components = [];

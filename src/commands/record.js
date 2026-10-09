@@ -256,10 +256,11 @@ module.exports = {
      * Build clean monospace scoreboard table:
      * Columns: Player | Champion | Elo +/- | Final Elo
      */
-    function buildTeamScoreboard(teamData, teamName, teamEmoji, isWinner, teamAvgElo) {
+    function buildTeamScoreboard(teamData, teamName, teamEmoji, isWinner, teamAvgElo, teamOdds) {
+      const oddsText = teamOdds != null ? ` • Odds: **${teamOdds}%**` : '';
       const header = isWinner
-        ? `${teamEmoji} **${teamName} (VICTORY)** 🏆 • Avg: **${teamAvgElo} Elo**`
-        : `${teamEmoji} **${teamName} (DEFEAT)** • Avg: **${teamAvgElo} Elo**`;
+        ? `${teamEmoji} **${teamName} (VICTORY)** 🏆${oddsText} • Avg: **${teamAvgElo} Elo**`
+        : `${teamEmoji} **${teamName} (DEFEAT)**${oddsText} • Avg: **${teamAvgElo} Elo**`;
 
       const colPlayer = 'Player'.padEnd(14);
       const colChamp = 'Champion'.padEnd(12);
@@ -325,11 +326,11 @@ module.exports = {
       .setDescription(
         `⏱️ **Duration**: ${minutes}m ${seconds}s • **Match Avg**: ${matchAvgRating} Elo\n` +
         `⚖️ **Team Avg**: 🔵 Blue **${blueAvgRating} Elo** vs 🔴 Red **${redAvgRating} Elo**\n` +
-        `🎲 **Pre-Match Odds**: Blue ${winProbBlue}% vs Red ${winProbRed}%\n` +
+        `🎲 **Pre-Match Odds**: 🔵 Blue **${winProbBlue}%** vs 🔴 Red **${winProbRed}%**\n` +
         `${mvpLine}\n\n` +
-        buildTeamScoreboard(team1Data, 'Blue Side', '🔵', blueWon, blueAvgRating) +
+        buildTeamScoreboard(team1Data, 'Blue Side', '🔵', blueWon, blueAvgRating, winProbBlue) +
         `👥 ${blueMentions}\n\n` +
-        buildTeamScoreboard(team2Data, 'Red Side', '🔴', !blueWon, redAvgRating) +
+        buildTeamScoreboard(team2Data, 'Red Side', '🔴', !blueWon, redAvgRating, winProbRed) +
         `👥 ${redMentions}`
       )
       .setFooter({ text: `Recorded by ${interaction.user.displayName} • Replay: ${attachment.name}` })

@@ -14,7 +14,13 @@ function skillTier(rating) {
   return { name: 'Iron', emoji: '⬛' };
 }
 
-const PODIUM_BADGES = ['🥇 #1', '🥈 #2', '🥉 #3'];
+function getRankBadge(rank) {
+  const tag = `\`#${String(rank + 1).padStart(2, '0')}\``;
+  if (rank === 0) return `🥇 ${tag}`;
+  if (rank === 1) return `🥈 ${tag}`;
+  if (rank === 2) return `🥉 ${tag}`;
+  return `🔹 ${tag}`;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -65,18 +71,23 @@ module.exports = {
       const isRanked = (p.wins + p.losses) >= 5;
       const form = recentFormsMap.get(p.discord_id) || [];
       const formCircles = form.map((won) => (won ? '🟢' : '🔴')).join('');
-      const formText = formCircles ? ` • ${formCircles}` : '';
 
       if (isRanked) {
         const rank = rankedPlayers.indexOf(p);
-        const isPodium = rank < 3;
-        const rankTag = isPodium ? PODIUM_BADGES[rank] : `\`#${String(rank + 1).padStart(2, '0')}\``;
+        const rankBadge = getRankBadge(rank);
         const totalGames = p.wins + p.losses;
         const winRate = `${Math.round((p.wins / totalGames) * 100)}%`;
         const ratingVal = Math.round(p.rating || 1000);
         const tier = skillTier(ratingVal);
 
-        let card = `> ${rankTag}  **${ratingVal} Elo** — **${p.riot_name}** ${tier.emoji}\n> └ 📊 **${p.wins}W ${p.losses}L** (${winRate} WR)${formText} • ${tier.name}`;
+        const lines = [
+          `> ${rankBadge}  **${ratingVal} Elo** — **${p.riot_name}** ${tier.emoji}`,
+          `> └ 📊 **${p.wins}W ${p.losses}L** (${winRate} WR) • ${tier.name}`,
+        ];
+
+        if (formCircles) {
+          lines.push(`> └ 🎮 **Recent**: ${formCircles}`);
+        }
 
         if (!compact) {
           const champs = topChampsMap.get(p.discord_id) || [];
@@ -84,9 +95,11 @@ module.exports = {
             const champDetails = champs
               .map((c) => `**${c.champion}** ${c.win_rate}% *(${c.games}G)*`)
               .join(' • ');
-            card += `\n> └ ⚔️ ${champDetails}`;
+            lines.push(`> └ ⚔️ ${champDetails}`);
           }
         }
+
+        let card = lines.join('\n');
 
         if (rank === 2 && (players.length > 3 || unrankedPlayers.length > 0)) {
           card += '\n> \n> ──────────────────────────────────────────';
@@ -99,7 +112,13 @@ module.exports = {
         return card;
       } else {
         const games = p.wins + p.losses;
-        return `> ⚪ **${p.riot_name}** — *Unranked (${games}/5)*${formText}`;
+        const unrankedLines = [
+          `> ⚪ **${p.riot_name}** — *Unranked (${games}/5)*`,
+        ];
+        if (formCircles) {
+          unrankedLines.push(`> └ 🎮 **Recent**: ${formCircles}`);
+        }
+        return unrankedLines.join('\n');
       }
     });
 
@@ -131,7 +150,7 @@ module.exports = {
         .setColor(0xf1c40f)
         .setDescription(headerText + chunk + footerText)
         .setFooter({
-          text: `Page ${pageNum}/${totalPages} • Form: 🟢W 🔴L (past 5) • OpenSkill rating`,
+          text: `Page ${pageNum}/${totalPages} • Recent: 🟢W 🔴L (past 5) • OpenSkill rating`,
         })
         .setTimestamp();
 

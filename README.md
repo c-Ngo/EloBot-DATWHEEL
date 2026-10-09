@@ -30,10 +30,10 @@ Whenever a `.rofl` replay is uploaded via `/record`, the bot posts a clean, alig
 
 ⏱️ Duration: 34m 14s • Match Avg: 1000 Elo
 ⚖️ Team Avg: 🔵 Blue 1000 Elo vs 🔴 Red 1000 Elo
-🎲 Pre-Match Odds: Blue 50% vs Red 50%
+🎲 Pre-Match Odds: 🔵 Blue 50% vs 🔴 Red 50%
 ⭐ Match MVP: Gojo Satoru (@Gojo) as Yasuo (+24(+2) Elo → 1024)
 
-🔵 Blue Side (VICTORY) 🏆 • Avg: 1000 Elo
+🔵 Blue Side (VICTORY) 🏆 • Odds: 50% • Avg: 1000 Elo
 Player         Champion          Elo +/-  Final Elo
 ───────────────────────────────────────────────────
 Gojo Satoru    Yasuo             +24(+2)       1024
@@ -43,7 +43,7 @@ who dat        Bard              +25(+2)       1025
 mid easy       Rakan             +23(+1)       1023
 👥 @Gojo @soohaeng @Timmeister10 @whodat @mideasy
 
-🔴 Red Side (DEFEAT) • Avg: 1000 Elo
+🔴 Red Side (DEFEAT) • Odds: 50% • Avg: 1000 Elo
 Player         Champion          Elo +/-  Final Elo
 ───────────────────────────────────────────────────
 Player6        Aatrox            -22(+1)        978
@@ -107,21 +107,27 @@ Instead of basic chess Elo, this bot uses **OpenSkill** — an open-source, pate
 
 ## 🏆 Leaderboard & Champion Tracking
 
-The `/leaderboard` displays rankings, display MMR, win-loss record, and top 3 champion signatures:
+The `/leaderboard` displays rankings, display MMR, win-loss record, recent matches form, and top 3 champion signatures:
 
 ```text
-🥇 1350 — Faker#KR1 (12W 3L • 80%) • 🟢🟢🔴🟢🟢
-   └ ⚔️ Ahri 83% (6G) • Azir 100% (4G) • LeBlanc 67% (3G)
+> 🥇 `#01`  1350 Elo — Faker#KR1 🟡
+> └ 📊 12W 3L (80% WR) • Gold
+> └ 🎮 Recent: 🟢🟢🔴🟢🟢
+> └ ⚔️ Ahri 83% (6G) • Azir 100% (4G) • LeBlanc 67% (3G)
 
-🥈 1280 — ShowMaker#KR1 (9W 5L • 64%) • 🟢🔴🟢🟢🔴
-   └ ⚔️ Syndra 75% (4G) • Zoe 60% (5G) • Katarina 50% (2G)
+> 🥈 `#02`  1280 Elo — ShowMaker#KR1 🟡
+> └ 📊 9W 5L (64% WR) • Gold
+> └ 🎮 Recent: 🟢🔴🟢🟢🔴
+> └ ⚔️ Syndra 75% (4G) • Zoe 60% (5G) • Katarina 50% (2G)
 
-🥉 1210 — Chovy#KR1 (8W 6L • 57%) • 🔴🟢🟢🔴🟢
-   └ ⚔️ Yone 80% (5G) • Sylas 50% (4G) • Akali 40% (5G)
+> 🥉 `#03`  1210 Elo — Chovy#KR1 🟡
+> └ 📊 8W 6L (57% WR) • Gold
+> └ 🎮 Recent: 🔴🟢🟢🔴🟢
+> └ ⚔️ Yone 80% (5G) • Sylas 50% (4G) • Akali 40% (5G)
 ```
 
 - **Top 3 Most Played Champions**: Ranked by games played and wins, displaying win percentage and match count.
-- **Recent Form Circles**: Displays `🟢` (win) and `🔴` (loss) for each player's past 5 matches.
+- **Recent Form Circles**: Dedicated row showing `🟢` (win) and `🔴` (loss) for each player's past 5 matches.
 - **5 Placement Matches (Provisional)**: Players with fewer than 5 games played are marked as Unranked (e.g. `Unranked (2/5)`), their Elo is kept private, and they appear at the bottom below all ranked players.
 - **Compact mode**: `/leaderboard compact:True` hides champion sub-lines for a high-density view.
 
