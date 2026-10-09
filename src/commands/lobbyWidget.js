@@ -61,9 +61,15 @@ module.exports = {
         if (msg) await msg.delete().catch(() => {});
       } catch (_) {}
 
-      // If active lobby in this channel, delete it
+      // If active lobby in this channel, delete announcement message and lobby
       const activeLobby = queries.getActiveLobbyForChannel(targetChannel.id);
       if (activeLobby) {
+        if (activeLobby.announcement_message_id) {
+          try {
+            const announceMsg = await targetChannel.messages.fetch(activeLobby.announcement_message_id).catch(() => null);
+            if (announceMsg) await announceMsg.delete().catch(() => {});
+          } catch (_) {}
+        }
         queries.deleteLobby(activeLobby.lobby_id);
       }
 

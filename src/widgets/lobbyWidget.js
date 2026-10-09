@@ -129,6 +129,79 @@ async function updateAllLobbyWidgets(client) {
   }
 }
 
+/**
+ * Safely deletes a message by ID in a channel.
+ * @param {import('discord.js').TextChannel} channel
+ * @param {string|null} messageId
+ */
+async function deleteChannelMessage(channel, messageId) {
+  if (!channel || !messageId) return;
+  try {
+    const msg = await channel.messages.fetch(messageId).catch(() => null);
+    if (msg) {
+      await msg.delete().catch(() => {});
+    }
+  } catch (_) {}
+}
+
+/**
+ * Ensures the channel has at most 1 auxiliary announcement message:
+ * - When full (10 players): Pings all 10 players that the lobby is full.
+ * - When open (<10 players): Pings role that slots are available (if replacing full message).
+ * @param {import('discord.js').TextChannel} channel
+ * @param {string} lobbyId
+ */
+async function syncLobbyAnnouncement(channel, lobbyId) {
+  if (!channel) return;
+  const lobby = queries.getLobby(lobbyId);
+  if (!lobby) return;
+
+  const activePlayers = queries.getLobbyPlayers(lobbyId);
+  const isFull = activePlayers.length >= 10;
+
+  if (isFull) {
+    // Delete existing creation/open announcement message if any
+    if (lobby.announcement_message_id) {
+      await deleteChannelMessage(channel, lobby.announcement_message_id);
+    }
+
+    // Ping all 10 players in the lobby that it is full
+    const playerPings = activePlayers.map((p) => `<@${p.discord_id}>`).join(' ');
+    const fullContent = `⚔️ **The 10 Man inhouse lobby is FULL (10/10)!** 🎲 Ready to spin teams!\n${playerPings}`;
+
+    const newMsg = await channel.send({
+      content: fullContent,
+      allowedMentions: { parse: ['users'] },
+    }).catch(() => null);
+
+    queries.updateLobbyAnnouncementMessageId(lobbyId, newMsg ? newMsg.id : null);
+  } else {
+    // If lobby had an announcement message and now dropped below 10, replace with open slot ping
+    if (lobby.announcement_message_id) {
+      await deleteChannelMessage(channel, lobby.announcement_message_id);
+
+      let leagueRole = null;
+      if (channel.guild?.roles) {
+        leagueRole =
+          channel.guild.roles.cache.find((r) => r.name.toLowerCase() === 'league?') ||
+          channel.guild.roles.cache.find((r) => r.name.toLowerCase() === 'league') ||
+          channel.guild.roles.cache.find((r) => /league/i.test(r.name));
+      }
+
+      const openContent = leagueRole
+        ? `<@&${leagueRole.id}> ⚔️ **A slot has opened in the 10 Man inhouse lobby (${activePlayers.length}/10)!**`
+        : `⚔️ **@League? A slot has opened in the 10 Man inhouse lobby (${activePlayers.length}/10)!**`;
+
+      const newMsg = await channel.send({
+        content: openContent,
+        allowedMentions: { parse: ['roles', 'users'] },
+      }).catch(() => null);
+
+      queries.updateLobbyAnnouncementMessageId(lobbyId, newMsg ? newMsg.id : null);
+    }
+  }
+}
+
 function skillTier(rating) {
   if (rating >= 2400) return { name: 'Challenger', emoji: '👑' };
   if (rating >= 2200) return { name: 'Grandmaster', emoji: '🔴' };
@@ -447,10 +520,14 @@ async function handleLobbyInteraction(interaction) {
       ? `<@&${leagueRole.id}> ⚔️ **<@${userId}> has opened an inhouse 10-man lobby!**`
       : `⚔️ **@League? <@${userId}> has opened an inhouse 10-man lobby!**`;
 
-    interaction.channel.send({
+    const announceMsg = await interaction.channel.send({
       content: pingContent,
       allowedMentions: { parse: ['roles', 'users'] },
-    }).catch(() => {});
+    }).catch(() => null);
+
+    if (announceMsg) {
+      queries.updateLobbyAnnouncementMessageId(newLobbyId, announceMsg.id);
+    }
 
     return interaction.reply({
       content: `✅ Inhouse lobby **${title}** created! Click **Join** on the widget to claim your spot.`,
@@ -501,7 +578,14 @@ async function handleLobbyInteraction(interaction) {
       // Slot available in the active 10
       queries.addPlayerToLobby(lobbyId, userId, nextSlot);
       const payload = createLobbyWidgetPayload(lobbyId);
-      return interaction.update(payload);
+      await interaction.update(payload);
+
+      // When lobby reaches 10 players, remove creation message and ping all 10 players
+      const activePlayers = queries.getLobbyPlayers(lobbyId);
+      if (activePlayers.length >= 10) {
+        await syncLobbyAnnouncement(interaction.channel, lobbyId);
+      }
+      return;
     } else {
       // 10 spots full -> Add to waitlist
       queries.addPlayerToWaitlist(lobbyId, userId);
@@ -549,9 +633,12 @@ async function handleLobbyInteraction(interaction) {
       const promoted = queries.popNextWaitlistPlayer(lobbyId);
       if (promoted) {
         queries.addPlayerToLobby(lobbyId, promoted.discord_id, vacatedSlot);
-        interaction.channel.send({
-          content: `🎉 <@${promoted.discord_id}> was automatically moved from the waitlist into **Slot [${String(vacatedSlot).padStart(2, '0')}]**!`,
-        }).catch(() => {});
+      }
+
+      // If lobby dropped below 10 players, sync announcement
+      const activePlayers = queries.getLobbyPlayers(lobbyId);
+      if (activePlayers.length < 10) {
+        await syncLobbyAnnouncement(interaction.channel, lobbyId);
       }
 
       const payload = createLobbyWidgetPayload(lobbyId);
@@ -642,9 +729,12 @@ async function handleLobbyInteraction(interaction) {
       const promoted = queries.popNextWaitlistPlayer(lobbyId);
       if (promoted) {
         queries.addPlayerToLobby(lobbyId, promoted.discord_id, slotNum);
-        interaction.channel.send({
-          content: `🎉 <@${promoted.discord_id}> was automatically moved from the waitlist into **Slot [${String(slotNum).padStart(2, '0')}]**!`,
-        }).catch(() => {});
+      }
+
+      // Sync announcement message if lobby dropped below 10
+      const activePlayers = queries.getLobbyPlayers(lobbyId);
+      if (activePlayers.length < 10) {
+        await syncLobbyAnnouncement(interaction.channel, lobbyId);
       }
     } else if (type === 'waitlist') {
       queries.removePlayerFromWaitlist(lobbyId, targetDiscordId);
@@ -702,6 +792,11 @@ async function handleLobbyInteraction(interaction) {
       });
     }
 
+    // Delete announcement/ping message from channel
+    if (lobby.announcement_message_id) {
+      await deleteChannelMessage(interaction.channel, lobby.announcement_message_id);
+    }
+
     queries.deleteLobby(lobbyId);
 
     const idlePayload = createIdleLobbyWidgetPayload();
@@ -722,4 +817,6 @@ module.exports = {
   updateAllLobbyWidgets,
   setLobbyWidgetClient,
   handleLobbyInteraction,
+  deleteChannelMessage,
+  syncLobbyAnnouncement,
 };

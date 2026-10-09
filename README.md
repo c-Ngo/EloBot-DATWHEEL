@@ -155,7 +155,11 @@ Instead of one-off slash commands, the lobby operates as a **permanent, self-res
   - When no match is active, the widget displays `⚪ No Active Lobby` with a clean queue prompt and a **⚔️ Create Lobby** button.
 - **Button / Modal Creation**:
   - Any linked player can click **⚔️ Create Lobby** to open a modal with optional **Scheduled Time** (e.g. `ASAP`, `in 30m`, `20:30 CET`) and **Lobby Title** (default: `Inhouse 5v5`).
-  - Upon submission, the permanent widget automatically updates into the active 10-player match queue and alerts the `@League?` role in the channel.
+- **Clean Channel Policy (Max 1 Widget & 1 Message)**:
+  - There is never more than 1 permanent widget and 1 auxiliary notification message in the lobby channel.
+  - **Open State**: A single message pings the `@League?` role notifying players that signups are open.
+  - **Full State (10/10)**: The creation announcement is automatically deleted and replaced with a ping alerting all 10 players in the lobby that it is full and ready to spin.
+  - **Dissolved State**: When dissolved, the announcement message is completely deleted, leaving only the permanent waiting widget with zero leftover clutter.
 - **10 Slot Capacity & Dynamic Header**:
   - Displays `# ⚔️ 10 MAN LOADING: [TITLE] ⚔️` while open (`<10` players).
   - Switches to `# ⚔️ 10 MAN: [TITLE] ⚔️` once all 10 spots are filled.
@@ -171,7 +175,7 @@ Instead of one-off slash commands, the lobby operates as a **permanent, self-res
 - **Random Team Spinner**:
   - Once full (10/10), the **🎲 Spin Random Teams** button is enabled, shuffling the 10 players into Blue Side and Red Side with computed Average Elo for both teams. Supports re-spinning.
 - **Auto-Resetting on Dissolve**:
-  - The lobby host or server Administrators can click **💥 Dissolve**. The widget instantly resets back to the **Idle / Waiting State** (`⚪ No Active Lobby`), ready for the next match!
+  - The lobby host or server Administrators can click **💥 Dissolve**. The widget instantly resets back to the **Idle / Waiting State** (`⚪ No Active Lobby`), and any announcement message is cleaned up.
 - **Setup Command**:
   ```text
   /lobby-widget [channel:#inhouse-queue] [action:Setup]

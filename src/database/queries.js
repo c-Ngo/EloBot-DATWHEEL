@@ -270,8 +270,8 @@ const stmts = {
 
   // Lobbies
   createLobby: db.prepare(`
-    INSERT INTO lobbies (lobby_id, guild_id, channel_id, message_id, owner_id, scheduled_time, title, status)
-    VALUES (@lobby_id, @guild_id, @channel_id, @message_id, @owner_id, @scheduled_time, @title, 'open')
+    INSERT INTO lobbies (lobby_id, guild_id, channel_id, message_id, announcement_message_id, owner_id, scheduled_time, title, status)
+    VALUES (@lobby_id, @guild_id, @channel_id, @message_id, @announcement_message_id, @owner_id, @scheduled_time, @title, 'open')
   `),
 
   getLobby: db.prepare(`SELECT * FROM lobbies WHERE lobby_id = ?`),
@@ -287,6 +287,10 @@ const stmts = {
 
   updateLobbyMessageId: db.prepare(`
     UPDATE lobbies SET message_id = ? WHERE lobby_id = ?
+  `),
+
+  updateLobbyAnnouncementMessageId: db.prepare(`
+    UPDATE lobbies SET announcement_message_id = ? WHERE lobby_id = ?
   `),
 
   // Lobby Players
@@ -592,7 +596,10 @@ module.exports = {
     if (existing) {
       stmts.deleteLobby.run(existing.lobby_id);
     }
-    return stmts.createLobby.run(data);
+    return stmts.createLobby.run({
+      ...data,
+      announcement_message_id: data.announcement_message_id || null,
+    });
   },
 
   getLobby(lobbyId) {
@@ -613,6 +620,10 @@ module.exports = {
 
   updateLobbyMessageId(lobbyId, messageId) {
     return stmts.updateLobbyMessageId.run(messageId, lobbyId);
+  },
+
+  updateLobbyAnnouncementMessageId(lobbyId, announcementMessageId) {
+    return stmts.updateLobbyAnnouncementMessageId.run(announcementMessageId || null, lobbyId);
   },
 
   clearLobbyTeams(lobbyId) {

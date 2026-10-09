@@ -95,16 +95,17 @@ db.exec(`
   );
 
   CREATE TABLE IF NOT EXISTS lobbies (
-    lobby_id        TEXT PRIMARY KEY,
-    guild_id        TEXT NOT NULL,
-    channel_id      TEXT NOT NULL,
-    message_id      TEXT NOT NULL UNIQUE,
-    owner_id        TEXT NOT NULL,
-    scheduled_time  TEXT NOT NULL,
-    title           TEXT NOT NULL DEFAULT 'Inhouse 5v5',
-    status          TEXT NOT NULL DEFAULT 'open',
-    teams_json      TEXT,
-    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    lobby_id                  TEXT PRIMARY KEY,
+    guild_id                  TEXT NOT NULL,
+    channel_id                TEXT NOT NULL,
+    message_id                TEXT NOT NULL UNIQUE,
+    announcement_message_id   TEXT,
+    owner_id                  TEXT NOT NULL,
+    scheduled_time            TEXT NOT NULL,
+    title                     TEXT NOT NULL DEFAULT 'Inhouse 5v5',
+    status                    TEXT NOT NULL DEFAULT 'open',
+    teams_json                TEXT,
+    created_at                TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS lobby_players (
@@ -131,5 +132,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_lobbies_msg ON lobbies(message_id);
   CREATE INDEX IF NOT EXISTS idx_lobby_widgets_msg ON lobby_widgets(message_id);
 `);
+
+// Non-destructive migrations for existing databases
+try {
+  db.exec('ALTER TABLE lobbies ADD COLUMN announcement_message_id TEXT;');
+} catch (_) {}
 
 module.exports = db;
