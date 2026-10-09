@@ -22,7 +22,7 @@ module.exports = {
   async execute(interaction) {
     const time = interaction.options.getString('time') || 'ASAP / When Full';
     const title = interaction.options.getString('title') || 'Inhouse 5v5';
-    const lobbyId = `lobby_${Date.now()}`;
+    const lobbyId = `lobby_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
     // Defer reply so we can post the full widget
     await interaction.deferReply();
