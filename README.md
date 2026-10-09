@@ -12,10 +12,10 @@ A Discord bot for tracking competitive skill ratings in custom League of Legends
 | `/record` | Everyone | Upload a `.rofl` replay file — auto-detects all 10 players, teams, stats, and outputs the match scoreboard summary |
 | `/leaderboard` | Everyone | View the skill leaderboard with rank medals, ratings, win rates, and top 3 champion signatures |
 | `/leaderboard-widget` | **Admin** | Deploy, refresh, or remove a permanent live leaderboard widget in a read-only channel |
+| `/lobby-widget` | **Admin** | Deploy, refresh, or remove a permanent live inhouse match lobby widget in a channel |
 | `/profile` | Everyone | View detailed player card: rating, peak, tier, win rate, top champions, recent matches, and role breakdown |
 | `/history` | Everyone | Detailed match history with champion, role, KDA, and rating deltas |
 | `/match` | Everyone | View the scoreboard summary of a previously recorded match |
-| `/createlobby` | Everyone | Create an interactive 10-player match lobby with real-time slot signups, automated waitlist, team spinner, and admin controls |
 | `/setelo` | **Admin** | Manually adjust a player's skill rating |
 | `/undo` | **Admin** | Completely revert a recorded match (restores previous $\mu$, $\sigma$, ratings, and champion stats) |
 
@@ -147,13 +147,18 @@ Deploy a permanent, interactive leaderboard widget directly to a dedicated read-
 
 ---
 
-## ⚔️ Interactive Inhouse Match Lobbies (`/createlobby`)
+## ⚔️ Persistent Inhouse Match Lobby Widget (`/lobby-widget`)
 
-Organize 5v5 custom matches with interactive slot signups, an automated waitlist, host management, and random team generation:
+Instead of one-off slash commands, the lobby operates as a **permanent, self-resetting channel widget**:
 
+- **Idle / Waiting State**:
+  - When no match is active, the widget displays `⚪ No Active Lobby` with a clean queue prompt and a **⚔️ Create Lobby** button.
+- **Button / Modal Creation**:
+  - Any linked player can click **⚔️ Create Lobby** to open a modal with optional **Scheduled Time** (e.g. `ASAP`, `in 30m`, `20:30 CET`) and **Lobby Title** (default: `Inhouse 5v5`).
+  - Upon submission, the permanent widget automatically updates into the active 10-player match queue and alerts the `@League?` role in the channel.
 - **10 Slot Capacity & Dynamic Header**:
-  - Displays `# ⚔️ 10 MAN LOADING ⚔️` while open (`<10` players).
-  - Switches to `# ⚔️ 10 MAN ⚔️` once all 10 spots are filled.
+  - Displays `# ⚔️ 10 MAN LOADING: [TITLE] ⚔️` while open (`<10` players).
+  - Switches to `# ⚔️ 10 MAN: [TITLE] ⚔️` once all 10 spots are filled.
 - **Button-Driven Signups**:
   - Players click **⚔️ Join** to claim an open slot, or **🚪 Leave** to vacate their spot.
   - Linked account validation: players must run `/link` before joining to display verified ratings and tiers.
@@ -163,15 +168,13 @@ Organize 5v5 custom matches with interactive slot signups, an automated waitlist
   - When an active player leaves or is kicked, the 1st person on the waitlist is automatically promoted into the active roster!
 - **Kick Players**:
   - The lobby host or server Administrators can click **👢 Kick** to select and remove any active or waitlisted player via a select dropdown.
-- **Role Ping Notification**:
-  - Automatically pings the `@League?` role when the lobby is created so everyone in the server is alerted.
 - **Random Team Spinner**:
   - Once full (10/10), the **🎲 Spin Random Teams** button is enabled, shuffling the 10 players into Blue Side and Red Side with computed Average Elo for both teams. Supports re-spinning.
-- **Dissolve Lobby**:
-  - The lobby host or server Administrators can click **💥 Dissolve** to remove the lobby widget and clean up the database entry.
-- **Create Command**:
+- **Auto-Resetting on Dissolve**:
+  - The lobby host or server Administrators can click **💥 Dissolve**. The widget instantly resets back to the **Idle / Waiting State** (`⚪ No Active Lobby`), ready for the next match!
+- **Setup Command**:
   ```text
-  /createlobby [time:"8:30 PM CET"] [title:"Friday Inhouses"]
+  /lobby-widget [channel:#inhouse-queue] [action:Setup]
   ```
 
 ---
@@ -184,10 +187,10 @@ Organize 5v5 custom matches with interactive slot signups, an automated waitlist
 | `/record` | `file` *(required)* | Upload a `.rofl` replay file. Parses match stats, validates all 10 linked players, computes OpenSkill rating changes, updates champion stats, and posts the scoreboard summary. |
 | `/leaderboard` | `compact` *(optional)* | View the server leaderboard with podium medals, tier emojis, win rates, and top 3 champion signatures. Set `compact:True` for dense view. |
 | `/leaderboard-widget` | `channel` *(optional)*, `action` *(optional: setup, refresh, remove)* | *(Admin)* Deploy or manage a permanent self-updating leaderboard widget with pagination buttons in a channel. |
+| `/lobby-widget` | `channel` *(optional)*, `action` *(optional: setup, refresh, remove)* | *(Admin)* Deploy, refresh, or remove a permanent live inhouse match lobby widget in a channel. |
 | `/profile` | `player` *(optional)* | View detailed player card: current rating, peak rating, tier, record (W/L/WR%), top 5 champions (games, WR%, KDA), recent 5 matches, and role breakdown. |
 | `/history` | `player` *(optional)*, `count` *(optional, 1–25, default: 10)* | View a player's recent matches with win/loss indicators, champion, role, KDA, and rating deltas. |
 | `/match` | `match_id` *(required)* | Inspect the detailed scoreboard summary of any past recorded match by its ID (e.g. `EUW1-8005104108`). |
-| `/createlobby` | `time` *(optional)*, `title` *(optional)* | Create an interactive 10-player custom game lobby widget with slot signups, automated waitlist, team spinner, and role notifications. |
 | `/setelo` | `player` *(required)*, `rating` *(required, 0–5000)* | *(Admin)* Manually override a player's skill rating, recalculating $\mu$ and ordinal, and syncing active widgets. |
 | `/undo` | `match_id` *(required)* | *(Admin)* Revert a recorded match, restoring previous Bayesian $\mu$, $\sigma$, ratings, wins/losses, and champion stats for all participants. |
 
@@ -314,11 +317,11 @@ EloTrackerBot/
     ├── config.js             # Environment configuration loader
     ├── deploy-commands.js    # Slash command registration script (global & guild)
     ├── commands/             # Slash command definitions
-    │   ├── createlobby.js    # /createlobby — 10-player custom game lobby widget
     │   ├── history.js        # /history — match history with rating deltas
     │   ├── leaderboard.js    # /leaderboard — rankings & top 3 champion signatures
     │   ├── leaderboardWidget.js # /leaderboard-widget — persistent live channel widget
     │   ├── link.js           # /link — registers Riot ID & initializes rating
+    │   ├── lobbyWidget.js    # /lobby-widget — persistent live inhouse lobby widget
     │   ├── match.js          # /match — inspect past match scoreboard summary
     │   ├── profile.js        # /profile — player card, peak rating, champ pool & role stats
     │   ├── record.js         # /record — parses .rofl replays with scoreboard summary

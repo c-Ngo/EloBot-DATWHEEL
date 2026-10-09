@@ -31,9 +31,12 @@ const {
 
 const {
   handleLobbyInteraction,
+  updateAllLobbyWidgets,
+  setLobbyWidgetClient,
 } = require('./widgets/lobbyWidget');
 
 setWidgetClient(client);
+setLobbyWidgetClient(client);
 
 // ── Load commands ───────────────────────────────
 client.commands = new Collection();
@@ -51,8 +54,8 @@ for (const file of commandFiles) {
 
 // ── Handle interactions ─────────────────────────
 client.on('interactionCreate', async (interaction) => {
-  // Handle button and select menu interactions (e.g. persistent leaderboard widget pagination & lobbies)
-  if (interaction.isButton() || interaction.isStringSelectMenu()) {
+  // Handle button, select menu, and modal interactions (e.g. persistent widgets & lobbies)
+  if (interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) {
     if (interaction.customId.startsWith('lb_widget:')) {
       return handleLeaderboardWidgetInteraction(interaction);
     }
@@ -102,6 +105,11 @@ client.once('ready', () => {
   // Sync active persistent leaderboard widgets
   updateAllLeaderboardWidgets(client).catch((err) => {
     console.error('Failed to sync leaderboard widgets on startup:', err);
+  });
+
+  // Sync active persistent lobby widgets
+  updateAllLobbyWidgets(client).catch((err) => {
+    console.error('Failed to sync lobby widgets on startup:', err);
   });
 });
 

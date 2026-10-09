@@ -242,6 +242,32 @@ const stmts = {
     DELETE FROM leaderboard_widgets WHERE channel_id = ?
   `),
 
+  // Lobby Widgets
+  saveLobbyWidget: db.prepare(`
+    INSERT INTO lobby_widgets (channel_id, guild_id, message_id, updated_at)
+    VALUES (@channel_id, @guild_id, @message_id, datetime('now'))
+    ON CONFLICT(channel_id) DO UPDATE SET
+      guild_id   = @guild_id,
+      message_id = @message_id,
+      updated_at = datetime('now')
+  `),
+
+  getAllLobbyWidgets: db.prepare(`
+    SELECT * FROM lobby_widgets
+  `),
+
+  getLobbyWidget: db.prepare(`
+    SELECT * FROM lobby_widgets WHERE channel_id = ?
+  `),
+
+  deleteLobbyWidget: db.prepare(`
+    DELETE FROM lobby_widgets WHERE channel_id = ?
+  `),
+
+  getActiveLobbyForChannel: db.prepare(`
+    SELECT * FROM lobbies WHERE channel_id = ? ORDER BY created_at DESC LIMIT 1
+  `),
+
   // Lobbies
   createLobby: db.prepare(`
     INSERT INTO lobbies (lobby_id, guild_id, channel_id, message_id, owner_id, scheduled_time, title, status)
@@ -535,8 +561,37 @@ module.exports = {
     return stmts.deleteLeaderboardWidget.run(channelId);
   },
 
+  // ── Lobby widget helpers ─────────────────────
+  saveLobbyWidget(channelId, guildId, messageId) {
+    return stmts.saveLobbyWidget.run({
+      channel_id: channelId,
+      guild_id: guildId || null,
+      message_id: messageId,
+    });
+  },
+
+  getAllLobbyWidgets() {
+    return stmts.getAllLobbyWidgets.all();
+  },
+
+  getLobbyWidget(channelId) {
+    return stmts.getLobbyWidget.get(channelId);
+  },
+
+  deleteLobbyWidget(channelId) {
+    return stmts.deleteLobbyWidget.run(channelId);
+  },
+
+  getActiveLobbyForChannel(channelId) {
+    return stmts.getActiveLobbyForChannel.get(channelId);
+  },
+
   // ── Lobby helpers ────────────────────────────
   createLobby(data) {
+    const existing = stmts.getLobbyByMessageId.get(data.message_id) || stmts.getActiveLobbyForChannel.get(data.channel_id);
+    if (existing) {
+      stmts.deleteLobby.run(existing.lobby_id);
+    }
     return stmts.createLobby.run(data);
   },
 

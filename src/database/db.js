@@ -87,6 +87,13 @@ db.exec(`
     updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS lobby_widgets (
+    channel_id    TEXT PRIMARY KEY,
+    guild_id      TEXT,
+    message_id    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS lobbies (
     lobby_id        TEXT PRIMARY KEY,
     guild_id        TEXT NOT NULL,
@@ -122,6 +129,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_lp_lobby   ON lobby_players(lobby_id);
   CREATE INDEX IF NOT EXISTS idx_lw_lobby   ON lobby_waitlist(lobby_id);
   CREATE INDEX IF NOT EXISTS idx_lobbies_msg ON lobbies(message_id);
+  CREATE INDEX IF NOT EXISTS idx_lobby_widgets_msg ON lobby_widgets(message_id);
 `);
 
 module.exports = db;

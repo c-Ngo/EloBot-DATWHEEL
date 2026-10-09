@@ -4,9 +4,130 @@ const {
   ButtonBuilder,
   ButtonStyle,
   StringSelectMenuBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   PermissionFlagsBits,
 } = require('discord.js');
 const queries = require('../database/queries');
+
+let lobbyWidgetClient = null;
+
+function setLobbyWidgetClient(client) {
+  lobbyWidgetClient = client;
+}
+
+/**
+ * Builds the embed and interactive components for an idle lobby widget (no active lobby).
+ * @returns {{ embeds: EmbedBuilder[], components: ActionRowBuilder[] }}
+ */
+function createIdleLobbyWidgetPayload() {
+  const embed = new EmbedBuilder()
+    .setColor(0x5865f2)
+    .setTitle('⚔️ 10 MAN INHOUSE LOBBY ⚔️')
+    .setDescription([
+      '══════════════════════════════════════════════',
+      '⚡ **Status**: `⚪ No Active Lobby`',
+      '══════════════════════════════════════════════',
+      '',
+      '> 🎮 There is currently no active inhouse match lobby.',
+      '> Click **Create Lobby** below to open a 10-player match queue!',
+      '',
+      '══════════════════════════════════════════════',
+    ].join('\n'))
+    .setFooter({
+      text: 'Season 2026 • 10 Man Inhouse • OpenSkill Bayesian Engine',
+    })
+    .setTimestamp();
+
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('lobby:create')
+      .setLabel('Create Lobby')
+      .setEmoji('⚔️')
+      .setStyle(ButtonStyle.Success)
+  );
+
+  return { embeds: [embed], components: [actionRow] };
+}
+
+/**
+ * Sets up a permanent inhouse lobby widget in the specified channel.
+ * @param {import('discord.js').TextChannel} targetChannel
+ * @param {string} guildId
+ * @returns {Promise<import('discord.js').Message>}
+ */
+async function setupLobbyWidget(targetChannel, guildId) {
+  const activeLobby = queries.getActiveLobbyForChannel(targetChannel.id);
+  const payload = activeLobby
+    ? createLobbyWidgetPayload(activeLobby.lobby_id)
+    : createIdleLobbyWidgetPayload();
+
+  // Clean up any previously registered widget message in this channel
+  const existing = queries.getLobbyWidget(targetChannel.id);
+  if (existing) {
+    try {
+      const oldMsg = await targetChannel.messages.fetch(existing.message_id).catch(() => null);
+      if (oldMsg) await oldMsg.delete().catch(() => {});
+    } catch (_) {}
+  }
+
+  const sentMessage = await targetChannel.send(payload);
+  queries.saveLobbyWidget(targetChannel.id, guildId, sentMessage.id);
+
+  if (activeLobby) {
+    queries.updateLobbyMessageId(activeLobby.lobby_id, sentMessage.id);
+  }
+
+  return sentMessage;
+}
+
+/**
+ * Updates a lobby widget in a channel to either its active lobby or idle state.
+ * @param {string} channelId
+ * @param {import('discord.js').Client} [client]
+ */
+async function updateLobbyWidget(channelId, client) {
+  const cl = client || lobbyWidgetClient;
+  if (!cl) return;
+
+  const widget = queries.getLobbyWidget(channelId);
+  if (!widget) return;
+
+  try {
+    const channel = await cl.channels.fetch(channelId).catch(() => null);
+    if (!channel) return;
+
+    const msg = await channel.messages.fetch(widget.message_id).catch(() => null);
+    if (!msg) {
+      queries.deleteLobbyWidget(channelId);
+      return;
+    }
+
+    const activeLobby = queries.getActiveLobbyForChannel(channelId);
+    const payload = activeLobby
+      ? createLobbyWidgetPayload(activeLobby.lobby_id)
+      : createIdleLobbyWidgetPayload();
+
+    await msg.edit(payload).catch(console.error);
+  } catch (err) {
+    console.error(`Error updating lobby widget for channel ${channelId}:`, err);
+  }
+}
+
+/**
+ * Syncs all registered lobby widgets across channels on startup.
+ * @param {import('discord.js').Client} [client]
+ */
+async function updateAllLobbyWidgets(client) {
+  const cl = client || lobbyWidgetClient;
+  if (!cl) return;
+
+  const widgets = queries.getAllLobbyWidgets();
+  for (const w of widgets) {
+    await updateLobbyWidget(w.channel_id, cl);
+  }
+}
 
 function skillTier(rating) {
   if (rating >= 2400) return { name: 'Challenger', emoji: '👑' };
@@ -205,20 +326,149 @@ function createLobbyWidgetPayload(lobbyId) {
  * @param {import('discord.js').Interaction} interaction
  */
 async function handleLobbyInteraction(interaction) {
-  if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+  if (!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return;
   const parts = interaction.customId.split(':');
   const action = parts[1];
   const lobbyId = parts[2];
+  const userId = interaction.user.id;
 
-  const lobby = queries.getLobby(lobbyId);
-  if (!lobby) {
+  // ── CREATE LOBBY BUTTON (OPEN MODAL) ──────────
+  if (action === 'create') {
+    const player = queries.getPlayer(userId);
+    if (!player) {
+      return interaction.reply({
+        content: '❌ You must link your League of Legends account with `/link` before you can create an inhouse lobby!',
+        ephemeral: true,
+      });
+    }
+
+    const activeLobby = queries.getActiveLobbyForChannel(interaction.channelId);
+    if (activeLobby) {
+      const activePayload = createLobbyWidgetPayload(activeLobby.lobby_id);
+      if (activePayload && interaction.isButton()) {
+        await interaction.update(activePayload).catch(() => {});
+      }
+      return interaction.followUp({
+        content: '⚠️ An active lobby is already running in this channel!',
+        ephemeral: true,
+      }).catch(() => {});
+    }
+
+    const modal = new ModalBuilder()
+      .setCustomId('lobby:modal_create')
+      .setTitle('Create 10 Man Inhouse Lobby');
+
+    const timeInput = new TextInputBuilder()
+      .setCustomId('lobby_time')
+      .setLabel('Scheduled Time (Optional)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('e.g. ASAP, in 30m, 20:30 CET')
+      .setValue('ASAP / When Full')
+      .setRequired(false)
+      .setMaxLength(50);
+
+    const titleInput = new TextInputBuilder()
+      .setCustomId('lobby_title')
+      .setLabel('Lobby Title (Optional)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('e.g. Inhouse 5v5')
+      .setValue('Inhouse 5v5')
+      .setRequired(false)
+      .setMaxLength(60);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(timeInput),
+      new ActionRowBuilder().addComponents(titleInput)
+    );
+
+    return interaction.showModal(modal);
+  }
+
+  // ── MODAL SUBMIT: INITIALIZE LOBBY ────────────
+  if (action === 'modal_create' && interaction.isModalSubmit()) {
+    const player = queries.getPlayer(userId);
+    if (!player) {
+      return interaction.reply({
+        content: '❌ You must link your League of Legends account with `/link` before creating a lobby!',
+        ephemeral: true,
+      });
+    }
+
+    const activeLobby = queries.getActiveLobbyForChannel(interaction.channelId);
+    if (activeLobby) {
+      return interaction.reply({
+        content: '⚠️ An active lobby is already running in this channel!',
+        ephemeral: true,
+      });
+    }
+
+    const time = interaction.fields.getTextInputValue('lobby_time')?.trim() || 'ASAP / When Full';
+    const title = interaction.fields.getTextInputValue('lobby_title')?.trim() || 'Inhouse 5v5';
+    const newLobbyId = `lobby_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    // Identify the persistent widget message id
+    const widget = queries.getLobbyWidget(interaction.channelId);
+    const messageId = widget ? widget.message_id : (interaction.message?.id || newLobbyId);
+
+    // Create the lobby in SQLite
+    queries.createLobby({
+      lobby_id: newLobbyId,
+      guild_id: interaction.guildId,
+      channel_id: interaction.channelId,
+      message_id: messageId,
+      owner_id: userId,
+      scheduled_time: time,
+      title: title,
+    });
+
+    const activePayload = createLobbyWidgetPayload(newLobbyId);
+
+    // Update the persistent widget message in channel
+    try {
+      const channel = interaction.channel;
+      const msg = await channel.messages.fetch(messageId).catch(() => null);
+      if (msg && activePayload) {
+        await msg.edit(activePayload);
+      }
+    } catch (err) {
+      console.error('Failed to update persistent lobby widget on create:', err);
+    }
+
+    // Role ping in channel
+    let leagueRole = null;
+    if (interaction.guild?.roles) {
+      leagueRole =
+        interaction.guild.roles.cache.find((r) => r.name.toLowerCase() === 'league?') ||
+        interaction.guild.roles.cache.find((r) => r.name.toLowerCase() === 'league') ||
+        interaction.guild.roles.cache.find((r) => /league/i.test(r.name));
+    }
+
+    const pingContent = leagueRole
+      ? `<@&${leagueRole.id}> ⚔️ **<@${userId}> has opened an inhouse 10-man lobby!**`
+      : `⚔️ **@League? <@${userId}> has opened an inhouse 10-man lobby!**`;
+
+    interaction.channel.send({
+      content: pingContent,
+      allowedMentions: { parse: ['roles', 'users'] },
+    }).catch(() => {});
+
     return interaction.reply({
-      content: '❌ This lobby no longer exists or has already been dissolved.',
+      content: `✅ Inhouse lobby **${title}** created! Click **Join** on the widget to claim your spot.`,
       ephemeral: true,
     });
   }
 
-  const userId = interaction.user.id;
+  const lobby = queries.getLobby(lobbyId);
+  if (!lobby) {
+    const idlePayload = createIdleLobbyWidgetPayload();
+    if (interaction.isButton()) {
+      await interaction.update(idlePayload).catch(() => {});
+    }
+    return interaction.followUp({
+      content: '❌ This lobby no longer exists or has already been dissolved.',
+      ephemeral: true,
+    }).catch(() => {});
+  }
 
   // ── JOIN ACTION (OR JOIN WAITLIST IF FULL) ─────
   if (action === 'join') {
@@ -454,16 +704,22 @@ async function handleLobbyInteraction(interaction) {
 
     queries.deleteLobby(lobbyId);
 
-    // Delete message widget
-    await interaction.message.delete().catch(() => {});
-    return interaction.reply({
-      content: '💥 Inhouse lobby has been dissolved and removed.',
+    const idlePayload = createIdleLobbyWidgetPayload();
+    await interaction.update(idlePayload);
+
+    return interaction.followUp({
+      content: '💥 Inhouse lobby has been dissolved. The widget has returned to waiting state.',
       ephemeral: true,
     }).catch(() => {});
   }
 }
 
 module.exports = {
+  createIdleLobbyWidgetPayload,
   createLobbyWidgetPayload,
+  setupLobbyWidget,
+  updateLobbyWidget,
+  updateAllLobbyWidgets,
+  setLobbyWidgetClient,
   handleLobbyInteraction,
 };
