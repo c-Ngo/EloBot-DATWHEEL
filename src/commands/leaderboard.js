@@ -59,9 +59,13 @@ module.exports = {
 
     const players = [...rankedPlayers, ...unrankedPlayers];
     const topChampsMap = queries.getAllTopChampions(3);
+    const recentFormsMap = queries.getAllRecentForms(5);
 
     const playerBlocks = players.map((p, i) => {
       const isRanked = (p.wins + p.losses) >= 5;
+      const form = recentFormsMap.get(p.discord_id) || [];
+      const formCircles = form.map((won) => (won ? '🟢' : '🔴')).join('');
+      const formText = formCircles ? ` • ${formCircles}` : '';
 
       if (isRanked) {
         const rank = rankedPlayers.indexOf(p);
@@ -72,7 +76,7 @@ module.exports = {
         const ratingVal = Math.round(p.rating || 1000);
         const tier = skillTier(ratingVal);
 
-        let card = `> ${rankTag}  **${ratingVal} Elo** — **${p.riot_name}** ${tier.emoji}\n> └ 📊 **${p.wins}W ${p.losses}L** (${winRate} WR) • ${tier.name}`;
+        let card = `> ${rankTag}  **${ratingVal} Elo** — **${p.riot_name}** ${tier.emoji}\n> └ 📊 **${p.wins}W ${p.losses}L** (${winRate} WR)${formText} • ${tier.name}`;
 
         if (!compact) {
           const champs = topChampsMap.get(p.discord_id) || [];
@@ -95,7 +99,7 @@ module.exports = {
         return card;
       } else {
         const games = p.wins + p.losses;
-        return `> ⚪ **${p.riot_name}** — *Unranked (${games}/5)*`;
+        return `> ⚪ **${p.riot_name}** — *Unranked (${games}/5)*${formText}`;
       }
     });
 
@@ -127,7 +131,7 @@ module.exports = {
         .setColor(0xf1c40f)
         .setDescription(headerText + chunk + footerText)
         .setFooter({
-          text: `Page ${pageNum}/${totalPages} • ${players.length} players tracked • OpenSkill / TrueSkill rating`,
+          text: `Page ${pageNum}/${totalPages} • Form: 🟢W 🔴L (past 5) • OpenSkill rating`,
         })
         .setTimestamp();
 

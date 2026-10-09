@@ -23,33 +23,34 @@ A Discord bot for tracking competitive skill ratings in custom League of Legends
 
 ## 📊 Post-Game Scoreboard Summary
 
-Whenever a `.rofl` replay is uploaded via `/record`, the bot posts a clean, aligned match scoreboard summary showing **Player**, **Champion played**, **Elo +/-**, and **Final Elo**:
+Whenever a `.rofl` replay is uploaded via `/record`, the bot posts a clean, aligned match scoreboard summary showing match and team average Elo, **Player**, **Champion played**, **Elo +/- (with performance modifier in brackets)**, and **Final Elo**:
 
 ```text
 🎮 Match Scoreboard Summary Recorded for EUW1-8005104108
 
-⏱️ Duration: 34m 14s • Avg Elo: 1000
+⏱️ Duration: 34m 14s • Match Avg: 1000 Elo
+⚖️ Team Avg: 🔵 Blue 1000 Elo vs 🔴 Red 1000 Elo
 🎲 Pre-Match Odds: Blue 50% vs Red 50%
-⭐ Match MVP: Gojo Satoru (@Gojo) as Yasuo (+24 Elo → 1024)
+⭐ Match MVP: Gojo Satoru (@Gojo) as Yasuo (+24(+2) Elo → 1024)
 
-🔵 Blue Side (VICTORY) 🏆
-Player         Champion      Elo +/-  Final Elo
-───────────────────────────────────────────────
-Gojo Satoru    Yasuo             +24       1024
-soohaeng       Chogath           +26       1026
-Timmeister10   Veigar            +21       1021
-who dat        Bard              +25       1025
-mid easy       Rakan             +23       1023
+🔵 Blue Side (VICTORY) 🏆 • Avg: 1000 Elo
+Player         Champion          Elo +/-  Final Elo
+───────────────────────────────────────────────────
+Gojo Satoru    Yasuo             +24(+2)       1024
+soohaeng       Chogath           +26(+3)       1026
+Timmeister10   Veigar            +21(+0)       1021
+who dat        Bard              +25(+2)       1025
+mid easy       Rakan             +23(+1)       1023
 👥 @Gojo @soohaeng @Timmeister10 @whodat @mideasy
 
-🔴 Red Side (DEFEAT)
-Player         Champion      Elo +/-  Final Elo
-───────────────────────────────────────────────
-Player6        Aatrox            -22        978
-Player7        Viego             -24        976
-Player8        Syndra            -20        980
-Player9        Jinx              -23        977
-Player10       Nautilus          -21        979
+🔴 Red Side (DEFEAT) • Avg: 1000 Elo
+Player         Champion          Elo +/-  Final Elo
+───────────────────────────────────────────────────
+Player6        Aatrox            -22(+1)        978
+Player7        Viego             -24(-2)        976
+Player8        Syndra            -20(+2)        980
+Player9        Jinx              -23(-1)        977
+Player10       Nautilus          -21(+0)        979
 👥 @Player6 @Player7 @Player8 @Player9 @Player10
 ```
 
@@ -109,17 +110,18 @@ Instead of basic chess Elo, this bot uses **OpenSkill** — an open-source, pate
 The `/leaderboard` displays rankings, display MMR, win-loss record, and top 3 champion signatures:
 
 ```text
-🥇 1350 — Faker#KR1 (12W 3L • 80%)
+🥇 1350 — Faker#KR1 (12W 3L • 80%) • 🟢🟢🔴🟢🟢
    └ ⚔️ Ahri 83% (6G) • Azir 100% (4G) • LeBlanc 67% (3G)
 
-🥈 1280 — ShowMaker#KR1 (9W 5L • 64%)
+🥈 1280 — ShowMaker#KR1 (9W 5L • 64%) • 🟢🔴🟢🟢🔴
    └ ⚔️ Syndra 75% (4G) • Zoe 60% (5G) • Katarina 50% (2G)
 
-🥉 1210 — Chovy#KR1 (8W 6L • 57%)
+🥉 1210 — Chovy#KR1 (8W 6L • 57%) • 🔴🟢🟢🔴🟢
    └ ⚔️ Yone 80% (5G) • Sylas 50% (4G) • Akali 40% (5G)
 ```
 
 - **Top 3 Most Played Champions**: Ranked by games played and wins, displaying win percentage and match count.
+- **Recent Form Circles**: Displays `🟢` (win) and `🔴` (loss) for each player's past 5 matches.
 - **5 Placement Matches (Provisional)**: Players with fewer than 5 games played are marked as Unranked (e.g. `Unranked (2/5)`), their Elo is kept private, and they appear at the bottom below all ranked players.
 - **Compact mode**: `/leaderboard compact:True` hides champion sub-lines for a high-density view.
 

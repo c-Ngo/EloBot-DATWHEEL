@@ -244,28 +244,40 @@ module.exports = {
     // ── 9. Build game scoreboard summary ──
     const minutes = Math.floor(gameLength / 60);
     const seconds = gameLength % 60;
+    const matchAvgRating = Math.round(avgRating);
+    const blueAvgRating = Math.round(
+      team1Data.reduce((s, p) => s + (p.player.rating || 1000), 0) / team1Data.length
+    );
+    const redAvgRating = Math.round(
+      team2Data.reduce((s, p) => s + (p.player.rating || 1000), 0) / team2Data.length
+    );
 
     /**
      * Build clean monospace scoreboard table:
      * Columns: Player | Champion | Elo +/- | Final Elo
      */
-    function buildTeamScoreboard(teamData, teamName, teamEmoji, isWinner) {
+    function buildTeamScoreboard(teamData, teamName, teamEmoji, isWinner, teamAvgElo) {
       const header = isWinner
-        ? `${teamEmoji} **${teamName} (VICTORY)** 🏆`
-        : `${teamEmoji} **${teamName} (DEFEAT)**`;
+        ? `${teamEmoji} **${teamName} (VICTORY)** 🏆 • Avg: **${teamAvgElo} Elo**`
+        : `${teamEmoji} **${teamName} (DEFEAT)** • Avg: **${teamAvgElo} Elo**`;
 
       const colPlayer = 'Player'.padEnd(14);
       const colChamp = 'Champion'.padEnd(12);
-      const colDelta = 'Elo +/-'.padStart(8);
+      const colDelta = 'Elo +/-'.padStart(12);
       const colFinal = 'Final Elo'.padStart(10);
-      const divider = '─'.repeat(47);
+      const divider = '─'.repeat(51);
 
       const tableHeader = `${colPlayer} ${colChamp} ${colDelta} ${colFinal}`;
       const rows = teamData.map((td) => {
         const sr = skillMap.get(td.discord_id);
         const rp = td.replay;
+
         const deltaVal = sr.ratingDelta;
-        const deltaStr = (deltaVal >= 0 ? `+${deltaVal}` : `${deltaVal}`).padStart(8);
+        const perfVal = sr.perfRatingDelta ?? 0;
+        const deltaSign = deltaVal >= 0 ? '+' : '';
+        const perfSign = perfVal >= 0 ? '+' : '';
+        const deltaWithPerf = `${deltaSign}${deltaVal}(${perfSign}${perfVal})`;
+        const deltaStr = deltaWithPerf.padStart(12);
         const finalStr = String(sr.ratingAfter).padStart(10);
 
         const nameStr = (td.player.riot_name.length > 14
@@ -296,8 +308,12 @@ module.exports = {
       }
     }
     const mvpSr = skillMap.get(mvpTd.discord_id);
-    const mvpDelta = mvpSr.ratingDelta >= 0 ? `+${mvpSr.ratingDelta}` : `${mvpSr.ratingDelta}`;
-    const mvpLine = `⭐ **Match MVP**: **${mvpTd.player.riot_name}** (<@${mvpTd.discord_id}>) as **${mvpTd.replay.champion}** (${mvpDelta} Elo → ${mvpSr.ratingAfter})`;
+    const mvpDeltaVal = mvpSr.ratingDelta;
+    const mvpPerfVal = mvpSr.perfRatingDelta ?? 0;
+    const mvpDeltaSign = mvpDeltaVal >= 0 ? '+' : '';
+    const mvpPerfSign = mvpPerfVal >= 0 ? '+' : '';
+    const mvpDeltaStr = `${mvpDeltaSign}${mvpDeltaVal}(${mvpPerfSign}${mvpPerfVal})`;
+    const mvpLine = `⭐ **Match MVP**: **${mvpTd.player.riot_name}** (<@${mvpTd.discord_id}>) as **${mvpTd.replay.champion}** (${mvpDeltaStr} Elo → ${mvpSr.ratingAfter})`;
 
     // Mention tags for easy profile clicking
     const blueMentions = team1Data.map((td) => `<@${td.discord_id}>`).join(' ');
@@ -307,12 +323,13 @@ module.exports = {
       .setColor(blueWon ? 0x5865f2 : 0xff4444)
       .setTitle(`📊 Game Scoreboard Summary — \`${matchId}\``)
       .setDescription(
-        `⏱️ **Duration**: ${minutes}m ${seconds}s • **Avg Elo**: ${Math.round(avgRating)}\n` +
+        `⏱️ **Duration**: ${minutes}m ${seconds}s • **Match Avg**: ${matchAvgRating} Elo\n` +
+        `⚖️ **Team Avg**: 🔵 Blue **${blueAvgRating} Elo** vs 🔴 Red **${redAvgRating} Elo**\n` +
         `🎲 **Pre-Match Odds**: Blue ${winProbBlue}% vs Red ${winProbRed}%\n` +
         `${mvpLine}\n\n` +
-        buildTeamScoreboard(team1Data, 'Blue Side', '🔵', blueWon) +
+        buildTeamScoreboard(team1Data, 'Blue Side', '🔵', blueWon, blueAvgRating) +
         `👥 ${blueMentions}\n\n` +
-        buildTeamScoreboard(team2Data, 'Red Side', '🔴', !blueWon) +
+        buildTeamScoreboard(team2Data, 'Red Side', '🔴', !blueWon, redAvgRating) +
         `👥 ${redMentions}`
       )
       .setFooter({ text: `Recorded by ${interaction.user.displayName} • Replay: ${attachment.name}` })

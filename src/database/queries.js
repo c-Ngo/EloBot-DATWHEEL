@@ -197,6 +197,29 @@ const stmts = {
     ORDER BY games DESC, wins DESC
   `),
 
+  // Recent Matches Form
+  getAllRecentMatches: db.prepare(`
+    WITH RankedMatches AS (
+      SELECT mp.discord_id, mp.won, m.recorded_at,
+             ROW_NUMBER() OVER (PARTITION BY mp.discord_id ORDER BY m.recorded_at DESC) as rn
+      FROM match_players mp
+      JOIN matches m ON m.match_id = mp.match_id
+    )
+    SELECT discord_id, won, recorded_at, rn
+    FROM RankedMatches
+    WHERE rn <= ?
+    ORDER BY discord_id, rn DESC
+  `),
+
+  getPlayerRecentMatches: db.prepare(`
+    SELECT mp.won
+    FROM match_players mp
+    JOIN matches m ON m.match_id = mp.match_id
+    WHERE mp.discord_id = ?
+    ORDER BY m.recorded_at DESC
+    LIMIT ?
+  `),
+
   // Leaderboard Widgets
   saveLeaderboardWidget: db.prepare(`
     INSERT INTO leaderboard_widgets (channel_id, guild_id, message_id, updated_at)
@@ -472,6 +495,23 @@ module.exports = {
 
   getAllPlayerChampionStats(discordId) {
     return stmts.getAllPlayerChampionStats.all(discordId);
+  },
+
+  getAllRecentForms(limit = 5) {
+    const rows = stmts.getAllRecentMatches.all(limit);
+    const map = new Map();
+    for (const row of rows) {
+      if (!map.has(row.discord_id)) {
+        map.set(row.discord_id, []);
+      }
+      map.get(row.discord_id).push(row.won === 1);
+    }
+    return map;
+  },
+
+  getPlayerRecentForm(discordId, limit = 5) {
+    const rows = stmts.getPlayerRecentMatches.all(discordId, limit);
+    return rows.reverse().map((r) => r.won === 1);
   },
 
   // ── Leaderboard widget helpers ────────────────

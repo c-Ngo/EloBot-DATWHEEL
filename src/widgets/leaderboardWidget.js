@@ -98,6 +98,7 @@ function createLeaderboardWidgetPayload(requestedPage = 0) {
 
   // Get top 3 champions for all players
   const topChampsMap = queries.getAllTopChampions(3);
+  const recentFormsMap = queries.getAllRecentForms(5);
 
   const startIdx = page * PAGE_SIZE;
   const pagePlayers = players.slice(startIdx, startIdx + PAGE_SIZE);
@@ -112,6 +113,9 @@ function createLeaderboardWidgetPayload(requestedPage = 0) {
 
   const cardLines = pagePlayers.map((p, i) => {
     const isRanked = (p.wins + p.losses) >= 5;
+    const form = recentFormsMap.get(p.discord_id) || [];
+    const formCircles = form.map((won) => (won ? '🟢' : '🔴')).join('');
+    const formText = formCircles ? ` • ${formCircles}` : '';
 
     if (isRanked) {
       const globalRank = rankedPlayers.indexOf(p);
@@ -128,7 +132,7 @@ function createLeaderboardWidgetPayload(requestedPage = 0) {
           ? champs.map((c) => `**${c.champion}** ${c.win_rate}% *(${c.games}G)*`).join(' • ')
           : '*No champion data available*';
 
-      const statText = `📊 **${p.wins}W ${p.losses}L** (${winRate} WR) • ${tier.name}`;
+      const statText = `📊 **${p.wins}W ${p.losses}L** (${winRate} WR)${formText} • ${tier.name}`;
 
       let card = [
         `> ${rankTag}  **${ratingVal} Elo** — **${p.riot_name}** ${tier.emoji}`,
@@ -150,7 +154,7 @@ function createLeaderboardWidgetPayload(requestedPage = 0) {
     } else {
       // Unranked player (<5 games played)
       const games = p.wins + p.losses;
-      return `> ⚪ **${p.riot_name}** — *Unranked (${games}/5)*`;
+      return `> ⚪ **${p.riot_name}** — *Unranked (${games}/5)*${formText}`;
     }
   });
 
@@ -162,7 +166,7 @@ function createLeaderboardWidgetPayload(requestedPage = 0) {
   embed
     .setDescription([...headerLines, cardLines.join('\n\n'), ...footerBanner].join('\n'))
     .setFooter({
-      text: `Page ${page + 1}/${totalPages} • Season 2026 • OpenSkill Engine`,
+      text: `Page ${page + 1}/${totalPages} • Season 2026 • Form: 🟢W 🔴L (past 5) • OpenSkill Engine`,
     });
 
   const components = [];

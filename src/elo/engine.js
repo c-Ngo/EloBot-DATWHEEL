@@ -171,6 +171,12 @@ function calculateSkillChanges(team1, team2, winningTeam) {
     const ratingAfter = toDisplayRating({ mu: newMu, sigma: newSigma });
     const ratingDelta = ratingAfter - ratingBefore;
 
+    // Base match rating delta (without individual performance modifier)
+    const baseNewMu = Math.max(1.0, bayesianRating.mu);
+    const baseRatingAfter = toDisplayRating({ mu: baseNewMu, sigma: bayesianRating.sigma });
+    const baseRatingDelta = baseRatingAfter - ratingBefore;
+    const perfRatingDelta = ratingDelta - baseRatingDelta;
+
     results.push({
       discord_id: player.discord_id,
       // OpenSkill / TrueSkill primitives
@@ -187,6 +193,8 @@ function calculateSkillChanges(team1, team2, winningTeam) {
       ratingBefore,
       ratingAfter,
       ratingDelta,
+      baseRatingDelta,
+      perfRatingDelta,
 
       // Backward compatibility aliases
       eloBefore: ratingBefore,
